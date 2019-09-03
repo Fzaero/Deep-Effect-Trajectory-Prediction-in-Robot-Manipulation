@@ -41,7 +41,6 @@ def validate_model(modelNumber,features,FeatureSize,seq_length,model):
 		series,_,_,_,indexes=get_data_for_model(modelNumber,features,FeatureSize)
 		sample=np.zeros([val_len,seq_length,6])
 		sample2=np.zeros([val_len,128,128,1])
-		sample3=np.zeros([val_len,seq_length,10])
 		max_traj_len=0
 		trajectoryIndexVal=indexes[1400:1500]
 		for ii in range(val_len):
@@ -56,12 +55,17 @@ def validate_model(modelNumber,features,FeatureSize,seq_length,model):
 				sample[ii,t,:6]=scaler_x.transform(series[i][0:1,:])
 		sample2=(sample2.astype('float32') / 255. / 0.5).astype('int32')
 		for t in range(max_traj_len-1):
-			result = model.predict([sample2,sample,sample3], batch_size=100, verbose=0)
+			result = model.predict([sample2,sample], batch_size=16, verbose=0)
 			for i in range(val_len):
-				if t<len(trajectoryOrij[i])-1:
-					trajectory[i][t+1,:]=scaler_x.inverse_transform(result[i:i+1,:])
-				sample[i,:seq_length-1,:]=sample[i,1:seq_length,:]
-				sample[i,seq_length-1:seq_length,:6]=result[i,:]
+				if t<seq_length-1:
+					if t<len(trajectoryOrij[i])-1:
+						trajectory[i][t+1,:]=scaler_x.inverse_transform(result[i:i+1,t,:])
+					sample[i,t+1,:6]=result[i,t,:]
+				else:
+					if t<len(trajectoryOrij[i])-1:
+						trajectory[i][t+1,:]=scaler_x.inverse_transform(result[i:i+1,-1,:])
+					sample[i,:seq_length-1,:]=sample[i,1:seq_length,:]
+					sample[i,seq_length-1:seq_length,:6]=result[i,-1,:]
 	else :
 		scaler_filename = scalers_path+"scaler_f"+str(features)+"_fs"+ str(FeatureSize)+".save"
 		scaler_features = joblib.load(scaler_filename) 
@@ -87,9 +91,9 @@ def validate_model(modelNumber,features,FeatureSize,seq_length,model):
 					sample2[ii,t,:]=scaler_features.transform(selected_features[i:i+1,:])
 		for t in range(max_traj_len-1):
 			if modelNumber==1:
-				result = model.predict(sample, batch_size=100, verbose=0)
+				result = model.predict(sample, batch_size=100, verbose=0)[:,-1,:]
 			if modelNumber==2:
-				result = model.predict({sample,sample2}, batch_size=100, verbose=0)
+				result = model.predict({sample,sample2}, batch_size=100, verbose=0)[:,-1,:]
 			for i in range(val_len):
 				if t<len(trajectoryOrij[i])-1:
 					trajectory[i][t+1,:]=scaler_x.inverse_transform(result[i:i+1,:])
